@@ -1,0 +1,18 @@
+# Shortcuts
+*.lnk
+
+# Operating System files
+Thumbs.db
+EHthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store

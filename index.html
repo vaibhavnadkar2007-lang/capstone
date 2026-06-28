@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="hi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Finder India – फोन खोजक</title>
+    <meta name="description" content="Google Phone Finder India Simulator – भारतीय संस्करण। अपने Android फोन को खोजें।">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* India‑specific overrides */
+        :root {
+            --color-saffron: #FF6600;
+            --color-india-green: #138808;
+            --color-navy: #000080;
+        }
+
+        .india-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(90deg, #FF6600 33.3%, white 33.3% 66.6%, #138808 66.6%);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #000080;
+            letter-spacing: 0.5px;
+        }
+
+        .captcha-noise {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(255, 255, 255, 0.03) 3px, rgba(255, 255, 255, 0.03) 4px);
+            pointer-events: none;
+        }
+
+        .city-tag {
+            font-size: 0.62rem;
+            color: var(--color-saffron);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .network-badge {
+            font-size: 0.62rem;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-weight: 700;
+        }
+
+        .jio {
+            background: rgba(0, 100, 255, 0.15);
+            color: #4285f4;
+        }
+
+        .airtel {
+            background: rgba(220, 50, 50, 0.15);
+            color: #ea4335;
+        }
+
+        .bsnl {
+            background: rgba(255, 150, 0, 0.15);
+            color: #fbbc05;
+        }
+
+        .vi {
+            background: rgba(128, 0, 128, 0.15);
+            color: #9c27b0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ══════════ HEADER ══════════ -->
+    <header class="app-header">
+        <div class="logo-container">
+            <svg class="fmd-logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="#FF6600" stroke-width="2.5" />
+                <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+                    fill="#138808" />
+                <circle cx="12" cy="12" r="3" fill="#FF6600" />
+            </svg>
+            <div class="logo-text">
+                <span style="color:var(--color-saffron)">Phone</span>
+                <span style="color:white"> </span>
+                <span style="color:#138808">Finder</span>
+                &nbsp;
+                <span class="india-badge">🇮🇳 INDIA</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <!-- Language Selector -->
+            <div class="lang-selector-container">
+                <button class="lang-toggle-btn active" id="langBtnHi" onclick="changeLanguage('hi')">हिन्दी</button>
+                <button class="lang-toggle-btn" id="langBtnEn" onclick="changeLanguage('en')">English</button>
+            </div>
+            <div class="user-badge">
+                <div class="user-avatar" id="userAvatar" style="background:var(--color-saffron);">G</div>
+                <div style="text-align:left;">
+                    <div id="userName" style="font-weight:600;line-height:1.2;" data-translate="user_name_placeholder">
+                        Google उपयोगकर्ता</div>
+                    <div id="userEmail" style="font-size:0.72rem;color:var(--text-secondary);"
+                        data-translate="sign_in_required">साइन इन आवश्यक</div>
+                </div>
+            </div>
+            <span
+                style="font-size:0.75rem;color:var(--text-muted);padding:4px 10px;border:1px solid var(--border-glass);border-radius:12px;">IST
+                UTC+5:30</span>
+            <button class="logout-btn" onclick="location.reload()" data-translate="sign_out">साइन आउट</button>
+        </div>
+    </header>
+
+    <!-- ══════════ MAIN LAYOUT ══════════ -->
+    <div class="app-container">
+
+        <!-- ── SIDEBAR ── -->
+        <aside class="sidebar">
+
+            <!-- Device Status Card -->
+            <section class="glass-card" id="deviceStatusCard">
+                <h2 style="font-family:var(--font-outfit);font-size:1.05rem;font-weight:600;color:var(--text-secondary);"
+                    data-translate="choose_device">डिवाइस चुनें</h2>
+                <p style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;" data-translate="signin_prompt">साइन
+                    इन करें और अपने जुड़े डिवाइस की लोकेशन देखें।</p>
+            </section>
+
+            <!-- Device List -->
+            <section class="glass-card">
+                <h3 class="section-title">
+                    <span data-translate="connected_devices">जुड़े डिवाइस</span>
+                    <span class="city-tag" data-translate="india_label">भारत</span>
+                </h3>
+                <div class="device-list" id="deviceListContainer"></div>
+            </section>
+
+            <!-- Remote Commands -->
+            <section class="glass-card">
+                <h3 class="section-title" data-translate="remote_commands">रिमोट कमांड</h3>
+                <div class="control-actions">
+                    <button class="control-btn" onclick="triggerRing()" id="btnRing">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span data-translate="btn_ring">अलार्म बजाएं</span>
+                    </button>
+                    <button class="control-btn" onclick="triggerSecure()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <span data-translate="btn_secure">सुरक्षित करें</span>
+                    </button>
+                    <button class="control-btn" onclick="triggerRadar()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path
+                                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                            </path>
+                            <path d="M2 12h20"></path>
+                        </svg>
+                        <span data-translate="btn_radar">पास में खोजें</span>
+                    </button>
+                    <button class="control-btn danger-btn" onclick="triggerErase()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
+                        </svg>
+                        <span data-translate="btn_erase">डेटा मिटाएं</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Telemetry Toggles -->
+            <section class="glass-card">
+                <h3 class="section-title" data-translate="telemetry_settings">टेलीमेट्री सेटिंग</h3>
+                <div class="toggle-row">
+                    <div class="toggle-label">
+                        <span class="toggle-title" data-translate="offline_network">ऑफलाइन नेटवर्क</span>
+                        <span class="toggle-desc" data-translate="offline_network_desc">Bluetooth बीकन से डिवाइस
+                            खोजें</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="fmdNetToggle" onchange="handleFMDNetworkToggle(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-label">
+                        <span class="toggle-title" data-translate="gps_movement">GPS मूवमेंट</span>
+                        <span class="toggle-desc" data-translate="gps_movement_desc">लाइव लोकेशन ड्रिफ्ट सिमुलेट
+                            करें</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="gpsDriftToggle" onchange="handleGpsDriftToggle(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- Crypto Console -->
+            <section class="glass-card console-container">
+                <div class="console-header">
+                    <h3 class="console-title" data-translate="security_log">सुरक्षा लॉग (IST)</h3>
+                    <div class="console-ctrl-bar">
+                        <button class="console-ctrl-btn" onclick="clearConsole()" data-translate="clear_btn">साफ
+                            करें</button>
+                    </div>
+                </div>
+                <div class="terminal-shell" id="terminalLogs">
+                    <div class="log-entry info" id="initLogEntry"><span class="log-timestamp">--:--:-- IST</span>[INIT]
+                        सिस्टम तैयार है। Google खाते से साइन इन करें...</div>
+                </div>
+            </section>
+        </aside>
+
+        <!-- ── MAP PANEL ── -->
+        <main class="map-view">
+            <div id="map"></div>
+
+            <!-- Fullscreen Toggle Button -->
+            <button id="fullscreenMapBtn" class="glass-card map-overlay-btn" onclick="toggleFullscreenMap()">
+                <svg id="fullscreenIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                </svg>
+                <span id="fullscreenBtnText" data-translate="fullscreen">पूर्ण स्क्रीन</span>
+            </button>
+
+            <!-- Timeline overlay -->
+            <div style="position:absolute;top:20px;right:20px;z-index:1000;width:290px;"
+                class="glass-card timeline-card">
+                <h3 class="section-title">
+                    <span data-translate="timeline_title">24 घंटे का इतिहास</span>
+                </h3>
+                <div class="timeline-items" id="timelineItems"></div>
+            </div>
+
+            <!-- Indian city pins legend -->
+            <div style="position:absolute;bottom:30px;left:20px;z-index:1000;" class="glass-card"
+                style="padding:10px 14px;">
+                <div
+                    style="font-size:0.68rem;color:var(--text-muted);margin-bottom:6px;font-family:var(--font-outfit);text-transform:uppercase;letter-spacing:0.5px;">
+                    शहर</div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;">
+                        <span
+                            style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 6px #10b981;"></span>
+                        मुंबई — Samsung Galaxy S23 Ultra
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;">
+                        <span
+                            style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 6px #10b981;"></span>
+                        दिल्ली — Realme GT 5G
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;">
+                        <span
+                            style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;box-shadow:0 0 6px #f59e0b;"></span>
+                        बेंगलुरु — OnePlus 11R 5G (ऑफलाइन)
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ══════════ EDUCATIONAL INFO SECTION ══════════ -->
+    <section class="info-section">
+        <div class="info-tabs">
+            <button class="info-tab-btn active" onclick="selectTab('architectureTab')">सिस्टम आर्किटेक्चर</button>
+            <button class="info-tab-btn" onclick="selectTab('flowchartsTab')">अनुक्रम आरेख</button>
+            <button class="info-tab-btn" onclick="selectTab('databaseTab')">डेटाबेस डिज़ाइन</button>
+            <button class="info-tab-btn" onclick="selectTab('securityTab')">सुरक्षा और एन्क्रिप्शन</button>
+        </div>
+
+        <!-- Architecture Tab -->
+        <div class="tab-pane active" id="architectureTab">
+            <div class="doc-grid">
+                <div class="doc-text">
+                    <h3>Phone Finder India — सिस्टम आर्किटेक्चर</h3>
+                    <p>Phone Finder India भारतीय उपयोगकर्ताओं के लिए एक सुरक्षित इंफ्रास्ट्रक्चर पर काम करता है जो वेब
+                        क्लाइंट, Google Cloud गेटवे, FCM पुश ब्रोकर और Android डिवाइस को जोड़ता है।</p>
+                    <ul>
+                        <li><strong>वेब क्लाइंट कंसोल:</strong> Leaflet.js पर बना मानचित्र इंटरफेस।</li>
+                        <li><strong>Google Identity API:</strong> OAuth 2.0 + CAPTCHA + MFA प्रमाणीकरण।</li>
+                        <li><strong>Phone Finder Core Gateway:</strong> REST/WebSockets से कमांड रिले।</li>
+                        <li><strong>Firebase Cloud Messaging:</strong> Jio/Airtel/Vi/BSNL नेटवर्क पर पुश नोटिफिकेशन।
+                        </li>
+                        <li><strong>Google Play Services:</strong> GPS, Bluetooth बीकन और हार्डवेयर एक्सेस।</li>
+                    </ul>
+                </div>
+                <div class="diagram-container">
+                    <svg viewBox="0 0 600 350" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="100%" height="100%" fill="none" />
+                        <rect x="10" y="140" width="120" height="60" rx="8" fill="#1e293b" stroke="#FF6600"
+                            stroke-width="2" />
+                        <text x="70" y="168" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Phone Finder</text>
+                        <text x="70" y="182" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">Web Client</text>
+                        <rect x="220" y="40" width="140" height="60" rx="8" fill="#1e293b" stroke="#ea4335"
+                            stroke-width="2" />
+                        <text x="290" y="68" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Google Identity API</text>
+                        <text x="290" y="82" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">CAPTCHA + OAuth2 + MFA</text>
+                        <rect x="220" y="140" width="140" height="60" rx="8" fill="#1e293b" stroke="#138808"
+                            stroke-width="2" />
+                        <text x="290" y="168" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Phone Finder Gateway</text>
+                        <text x="290" y="182" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">REST &amp; WebSockets</text>
+                        <rect x="220" y="250" width="140" height="60" rx="8" fill="#0f172a" stroke="#64748b"
+                            stroke-width="1.5" stroke-dasharray="3,3" />
+                        <text x="290" y="278" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Database (PostgreSQL)</text>
+                        <text x="290" y="292" fill="#64748b" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">डिवाइस रजिस्ट्री + लोकेशन लॉग</text>
+                        <rect x="440" y="40" width="140" height="60" rx="8" fill="#1e293b" stroke="#fbbc05"
+                            stroke-width="2" />
+                        <text x="510" y="68" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">FCM Push Service</text>
+                        <text x="510" y="82" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">Jio/Airtel/Vi/BSNL</text>
+                        <rect x="440" y="140" width="140" height="60" rx="8" fill="#1e293b" stroke="#10b981"
+                            stroke-width="2" />
+                        <text x="510" y="168" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Android Device</text>
+                        <text x="510" y="182" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">Google Play Services</text>
+                        <path d="M100 140 Q 140 70 220 70" fill="none" stroke="#64748b" stroke-width="1.5"
+                            marker-end="url(#arrow)" />
+                        <line x1="130" y1="170" x2="220" y2="170" stroke="#FF6600" stroke-width="2" />
+                        <line x1="290" y1="200" x2="290" y2="250" stroke="#64748b" stroke-width="1.5" />
+                        <path d="M360 170 Q 400 70 440 70" fill="none" stroke="#64748b" stroke-width="1.5" />
+                        <line x1="510" y1="100" x2="510" y2="140" stroke="#fbbc05" stroke-width="2" />
+                        <path d="M440 185 Q 400 220 360 185" fill="none" stroke="#10b981" stroke-width="2"
+                            stroke-dasharray="4,2" />
+                        <defs>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5"
+                                orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+                            </marker>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flowchart Tab -->
+        <div class="tab-pane" id="flowchartsTab">
+            <div class="doc-grid">
+                <div class="doc-text">
+                    <h3>कमांड और टेलीमेट्री अनुक्रम</h3>
+                    <p>यहाँ समझाया गया है कि प्रत्येक रिमोट कमांड कैसे काम करती है।</p>
+                    <p><strong>1. अलार्म बजाएं (Ring Flow):</strong></p>
+                    <ul>
+                        <li>वेब क्लाइंट <code>POST /devices/{id}/ring</code> भेजता है।</li>
+                        <li>Gateway टोकन सत्यापित करता है और FCM को ट्रिगर करता है।</li>
+                        <li>FCM Jio/Airtel/Vi नेटवर्क के ज़रिए साइलेंट पुश भेजता है।</li>
+                        <li>Google Play Services अधिकतम वॉल्यूम पर अलार्म बजाता है।</li>
+                    </ul>
+                    <p><strong>2. ऑफलाइन Bluetooth ट्रैकिंग (Phone Finder Network):</strong></p>
+                    <ul>
+                        <li>खोया डिवाइस एन्क्रिप्टेड BLE बीकन प्रसारित करता है।</li>
+                        <li>पास का Android डिवाइस बीकन पकड़ता है, GPS लोकेशन जोड़ता है।</li>
+                        <li>रिपोर्ट owner की public key से एन्क्रिप्ट होकर Google को जाती है।</li>
+                        <li>Owner डैशबोर्ड पर private key से डिक्रिप्ट करता है।</li>
+                    </ul>
+                </div>
+                <div class="diagram-container">
+                    <svg viewBox="0 0 600 350" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                        <line x1="70" y1="40" x2="70" y2="300" stroke="#64748b" stroke-width="1.5"
+                            stroke-dasharray="4,4" />
+                        <line x1="220" y1="40" x2="220" y2="300" stroke="#64748b" stroke-width="1.5"
+                            stroke-dasharray="4,4" />
+                        <line x1="380" y1="40" x2="380" y2="300" stroke="#64748b" stroke-width="1.5"
+                            stroke-dasharray="4,4" />
+                        <line x1="530" y1="40" x2="530" y2="300" stroke="#64748b" stroke-width="1.5"
+                            stroke-dasharray="4,4" />
+                        <text x="70" y="28" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Web Client</text>
+                        <text x="220" y="28" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">PF Gateway</text>
+                        <text x="380" y="28" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">FCM (Jio/Airtel)</text>
+                        <text x="530" y="28" fill="white" font-size="10" text-anchor="middle"
+                            font-family="sans-serif">Android India</text>
+                        <line x1="70" y1="80" x2="220" y2="80" stroke="#FF6600" stroke-width="1.5"
+                            marker-end="url(#seq-arrow)" />
+                        <text x="145" y="73" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">1. POST /ring_command</text>
+                        <line x1="220" y1="120" x2="380" y2="120" stroke="#64748b" stroke-width="1.5"
+                            marker-end="url(#seq-arrow)" />
+                        <text x="300" y="113" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">2. FCM Push Trigger</text>
+                        <line x1="380" y1="160" x2="530" y2="160" stroke="#fbbc05" stroke-width="1.5"
+                            marker-end="url(#seq-arrow)" />
+                        <text x="455" y="153" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">3. Jio/Airtel नेटवर्क</text>
+                        <path d="M530 180 C 555 180, 555 210, 530 210" fill="none" stroke="#138808"
+                            stroke-width="1.5" />
+                        <text x="568" y="200" fill="white" font-size="8" font-family="sans-serif">4. अलार्म</text>
+                        <line x1="530" y1="240" x2="220" y2="240" stroke="#138808" stroke-dasharray="3,1"
+                            stroke-width="1.5" marker-end="url(#seq-arrow)" />
+                        <text x="375" y="233" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">5. कमांड स्थिति पुष्टि</text>
+                        <line x1="220" y1="270" x2="70" y2="270" stroke="#FF6600" stroke-dasharray="3,1"
+                            stroke-width="1.5" marker-end="url(#seq-arrow)" />
+                        <text x="145" y="263" fill="#94a3b8" font-size="8" text-anchor="middle"
+                            font-family="sans-serif">6. UI अपडेट</text>
+                        <defs>
+                            <marker id="seq-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5"
+                                markerHeight="5" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+                            </marker>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Tab -->
+        <div class="tab-pane" id="databaseTab">
+            <div class="doc-grid">
+                <div class="doc-text">
+                    <h3>डेटाबेस स्कीमा डिज़ाइन</h3>
+                    <p>PostgreSQL डेटाबेस में PostGIS एक्सटेंशन के साथ भारतीय उपयोगकर्ताओं और डिवाइस की जानकारी संग्रहीत
+                        होती है।</p>
+                    <ul>
+                        <li><strong>users:</strong> Google OAuth ID, ईमेल, मोबाइल (+91 नंबर)।</li>
+                        <li><strong>devices:</strong> IMEI, मॉडल, Jio/Airtel नेटवर्क टोकन, बैटरी, लॉक स्थिति।</li>
+                        <li><strong>location_logs:</strong> GPS/Cellular/BLE लोकेशन टाइम-सीरीज़।</li>
+                        <li><strong>command_audit_logs:</strong> ECDSA-हस्ताक्षरित कमांड ऑडिट ट्रेल।</li>
+                    </ul>
+                </div>
+                <div>
+                    <pre class="code-block"><code>-- Phone Finder India — PostgreSQL Schema
+
+CREATE TABLE users (
+    user_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    google_sub_id  VARCHAR(255) UNIQUE NOT NULL,
+    email          VARCHAR(255) NOT NULL,
+    full_name      VARCHAR(100) NOT NULL,
+    mobile_in      VARCHAR(15),  -- +91 XXXXX XXXXX
+    state_india    VARCHAR(50),  -- महाराष्ट्र, दिल्ली, कर्नाटक...
+    created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE devices (
+    device_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id     UUID REFERENCES users ON DELETE CASCADE,
+    fcm_token    VARCHAR(255) UNIQUE NOT NULL,
+    imei         VARCHAR(20),
+    model_name   VARCHAR(100) NOT NULL,
+    network      VARCHAR(30) DEFAULT 'Jio', -- Jio/Airtel/Vi/BSNL
+    os_version   VARCHAR(30) DEFAULT 'Android 14',
+    battery_pct  INT CHECK (battery_pct BETWEEN 0 AND 100),
+    is_locked    BOOLEAN DEFAULT FALSE,
+    lock_message TEXT,
+    lock_phone   VARCHAR(20),
+    is_erased    BOOLEAN DEFAULT FALSE,
+    updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE location_logs (
+    log_id       BIGSERIAL PRIMARY KEY,
+    device_id    UUID REFERENCES devices ON DELETE CASCADE,
+    location     POINT NOT NULL,       -- (lat, lng)
+    accuracy_m   FLOAT NOT NULL,
+    source       VARCHAR(30) DEFAULT 'GPS', -- GPS/Cellular/WiFi/BLE
+    city         VARCHAR(60),           -- मुंबई, दिल्ली, बेंगलुरु...
+    captured_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_device_loc ON location_logs(device_id, captured_at DESC);
+
+CREATE TABLE command_audit_logs (
+    audit_id    BIGSERIAL PRIMARY KEY,
+    user_id     UUID REFERENCES users,
+    device_id   UUID REFERENCES devices,
+    command     VARCHAR(30) NOT NULL, -- RING/LOCK/ERASE/SCAN
+    signature   BYTEA NOT NULL,
+    status      VARCHAR(20) DEFAULT 'QUEUED',
+    ist_time    TIMESTAMPTZ DEFAULT (NOW() AT TIME ZONE 'Asia/Kolkata')
+);</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Tab -->
+        <div class="tab-pane" id="securityTab">
+            <div class="doc-grid">
+                <div class="doc-text">
+                    <h3>गोपनीयता और एन्क्रिप्शन प्रोटोकॉल</h3>
+                    <p>Phone Finder India एक <strong>End-to-End Encrypted (E2EE)</strong> नेटवर्क पर काम करता है। Google
+                        भी लोकेशन नहीं पढ़ सकता।</p>
+                    <h4>1. CAPTCHA सुरक्षा</h4>
+                    <p>लॉगिन पर bot-प्रतिरोधी CAPTCHA सत्यापन अनिवार्य है।</p>
+                    <h4>2. असिमेट्रिक की-पेयर</h4>
+                    <p>Owner की private key Android Keystore/StrongBox में सुरक्षित है। Public key हैश BLE बीकन में
+                        प्रसारित होते हैं।</p>
+                    <h4>3. क्राउड-सोर्स रिलेइंग</h4>
+                    <p>पास का डिवाइस बीकन पकड़कर GPS जोड़ता है और AES-GCM + ECDH से एन्क्रिप्ट कर Google को भेजता है।
+                    </p>
+                    <h4>4. Zero-Knowledge Storage</h4>
+                    <p>Google केवल mailbox का काम करता है। केवल owner client-side पर private key से डिक्रिप्ट करता है।
+                    </p>
+                </div>
+                <div>
+                    <pre class="code-block"><code>// Phone Finder India — Crypto Demo
+
+// 1. Key pair generation (ECDH P-256)
+const ownerKeys = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveKey", "deriveBits"]
+);
+
+// 2. CAPTCHA validation (server-side mock)
+function verifyCaptcha(userInput, serverHash) {
+    const hashed = sha256(userInput.toUpperCase());
+    return hashed === serverHash; // constant-time compare
+}
+
+// 3. Stranger device encrypts coordinates
+const sharedSecret = await deriveSharedSecret(
+    strangerPrivKey, ownerPubKey
+);
+const aesKey = await deriveAesKey(sharedSecret);
+const encrypted = await encryptAesGcm(aesKey, JSON.stringify({
+    lat: 19.0760,       // Mumbai — Gateway of India
+    lng: 72.8777,
+    city: "मुंबई",
+    network: "Jio 5G",
+    timestamp_ist: new Date().toLocaleString("hi-IN", {
+        timeZone: "Asia/Kolkata"
+    })
+}));
+
+// 4. Uploaded to Google (zero-knowledge)
+// { hash: "a3f...", payload: "8ec...", iv: "0f1..." }
+// Google cannot decrypt this — only owner can.</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════ OVERLAYS ══════════ -->
+
+    <!-- LOGIN OVERLAY -->
+    <div class="overlay active" id="loginOverlay">
+        <div class="login-card" id="loginCard">
+
+            <!-- Step 1: Email + Password + CAPTCHA -->
+            <div id="loginFormContainer" style="width:100%;">
+                <div class="google-logo-large">
+                    <span class="blue">G</span><span class="red">o</span><span class="yellow">o</span><span
+                        class="blue">g</span><span class="green">l</span><span class="red">e</span>
+                </div>
+                <h1 class="login-title" data-translate="sign_in_title">साइन इन करें</h1>
+                <p class="login-subtitle" data-translate="sign_in_subtitle">Phone Finder India कंसोल पर जारी रखें</p>
+
+                <form id="loginForm">
+                    <div class="input-group">
+                        <label class="input-label" for="loginEmail">Gmail पता</label>
+                        <input class="text-input" type="email" id="loginEmail" placeholder="raj.sharma@gmail.com"
+                            required>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label" for="loginPassword">पासवर्ड</label>
+                        <input class="text-input" type="password" id="loginPassword" value="••••••••••" required>
+                    </div>
+
+                    <!-- CAPTCHA -->
+                    <div class="input-group" style="margin-top:10px;">
+                        <label class="input-label">सुरक्षा सत्यापन (CAPTCHA)</label>
+                        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+                            <div id="captchaDisplay" style="
+                            flex:1; height:46px;
+                            background: linear-gradient(135deg,#1e293b 0%,#0f172a 50%,#1a2540 100%);
+                            border: 1px dashed rgba(255,102,0,0.4);
+                            border-radius:8px;
+                            display:flex; align-items:center; justify-content:center;
+                            font-family:'Outfit',sans-serif; font-size:1.35rem; font-weight:800;
+                            letter-spacing:8px; user-select:none; position:relative; overflow:hidden;">
+                                <div class="captcha-noise"></div>
+                                <span id="captchaCodeText" style="position:relative;z-index:1;">MOCK4</span>
+                            </div>
+                            <button type="button" onclick="generateCaptcha()" title="नया CAPTCHA"
+                                style="
+                            height:46px; width:46px; background:rgba(255,102,0,0.1);
+                            border:1px solid rgba(255,102,0,0.3); border-radius:8px;
+                            cursor:pointer; color:#FF6600; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                                </svg>
+                            </button>
+                        </div>
+                        <input class="text-input" type="text" id="captchaInput"
+                            placeholder="ऊपर दिखे कोड यहाँ दर्ज करें" required autocomplete="off"
+                            style="text-transform:uppercase; letter-spacing:3px;">
+                        <div id="captchaError"
+                            style="color:var(--color-danger);font-size:0.72rem;margin-top:6px;display:none;">
+                            ❌ गलत CAPTCHA। कृपया फिर से प्रयास करें।
+                        </div>
+                    </div>
+
+                    <button class="action-btn" type="submit"
+                        style="margin-top:16px;background:linear-gradient(135deg,#FF6600,#e55a00);">
+                        आगे बढ़ें →
+                    </button>
+                </form>
+
+                <p style="font-size:0.7rem;color:var(--text-muted);margin-top:14px;text-align:center;">
+                    🔒 यह एक सिमुलेटेड शैक्षणिक ऐप है। कोई असली डेटा नहीं जुड़ा है।
+                </p>
+            </div>
+
+            <!-- Step 2: Watch 2FA -->
+            <div class="mfa-prompt" id="mfaPromptContainer">
+                <div class="google-logo-large">
+                    <span class="blue">G</span><span class="red">o</span><span class="yellow">o</span><span
+                        class="blue">g</span><span class="green">l</span><span class="red">e</span>
+                </div>
+                <h1 class="login-title">अपनी Watch देखें</h1>
+                <p class="login-subtitle">Google ने आपकी Pixel Watch पर सत्यापन प्रॉम्प्ट भेजा है।</p>
+
+                <div class="watch-mockup" onclick="handleMfaApprove()">
+                    <div class="watch-prompt-title">Google Login</div>
+                    <div class="watch-prompt-msg">क्या आप साइन इन करने की कोशिश कर रहे हैं?</div>
+                    <button class="watch-approve-btn">हाँ, स्वीकार करें</button>
+                </div>
+                <p style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">watch पर "हाँ, स्वीकार करें" टैप
+                    करें।</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- RING OVERLAY -->
+    <div class="overlay" id="ringOverlay">
+        <div class="ring-modal">
+            <div class="phone-ringing-wrapper">
+                <div class="radar-wave"></div>
+                <div class="radar-wave"></div>
+                <div class="radar-wave"></div>
+                <div class="ringing-phone-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path
+                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+            <h2 class="ring-title" id="ringingDeviceName">Samsung Galaxy S23 Ultra</h2>
+            <p class="ring-subtitle">अलार्म अधिकतम वॉल्यूम पर बजाया जा रहा है...</p>
+            <button class="ring-stop-btn" onclick="handleStopRing()">अलार्म बंद करें</button>
+        </div>
+    </div>
+
+    <!-- SECURE OVERLAY -->
+    <div class="overlay" id="secureOverlay">
+        <div class="secure-modal">
+            <div class="secure-header">
+                <div class="secure-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <h2 class="secure-title-text" id="secureDeviceName">Samsung Galaxy S23 Ultra</h2>
+            </div>
+            <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:18px;line-height:1.5;">
+                डिवाइस को दूर से लॉक करें और स्क्रीन पर संदेश व फोन नंबर दिखाएं।
+            </p>
+            <form class="secure-form" onsubmit="handleSecureSubmit(event)">
+                <div class="input-group">
+                    <label class="input-label" for="securePin">रिमोट PIN / पासवर्ड</label>
+                    <input class="text-input" type="password" id="securePin" placeholder="सुरक्षित लॉक PIN दर्ज करें"
+                        required>
+                </div>
+                <div class="input-group">
+                    <label class="input-label" for="secureMessage">स्क्रीन संदेश (वैकल्पिक)</label>
+                    <input class="text-input" type="text" id="secureMessage"
+                        placeholder="जैसे: कृपया मेरा फोन लौटाएं, इनाम मिलेगा!">
+                </div>
+                <div class="input-group">
+                    <label class="input-label" for="securePhone">फोन नंबर (वैकल्पिक)</label>
+                    <input class="text-input" type="text" id="securePhone" placeholder="+91 98765 43210">
+                </div>
+                <button class="secure-submit-btn" type="submit">डिवाइस लॉक करें</button>
+                <button class="secure-cancel-btn" type="button" onclick="toggleOverlay('secure',false)">रद्द
+                    करें</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- RADAR OVERLAY -->
+    <div class="overlay" id="radarOverlay">
+        <div class="radar-modal">
+            <h2 class="ring-title" id="radarDeviceName">Samsung Galaxy S23 Ultra</h2>
+            <p class="ring-subtitle" style="margin-bottom:10px;">UWB / Bluetooth निकटता खोज (सिमुलेशन)</p>
+            <div class="radar-scope-wrapper">
+                <div class="radar-grid"></div>
+                <div class="radar-sweep"></div>
+                <div class="radar-blip"></div>
+            </div>
+            <div class="radar-info-box">
+                <div class="radar-distance" id="radarDistVal">9.8m</div>
+                <div class="radar-hot-cold cold" id="radarIndicator">ठंडा (सिग्नल कमज़ोर)</div>
+                <div class="radar-rssi" id="radarRssiVal">Signal Strength (RSSI): -79 dBm</div>
+            </div>
+            <div class="radar-controls">
+                <button class="action-btn" onclick="walkCloser()"
+                    style="background:linear-gradient(135deg,#FF6600,#e55a00);">पास जाएं</button>
+                <button class="secure-cancel-btn" style="flex:1;" onclick="toggleOverlay('radar',false)">बंद
+                    करें</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ERASE OVERLAY -->
+    <div class="overlay" id="eraseOverlay">
+        <div class="erase-modal">
+            <div class="erase-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </div>
+            <h2 class="erase-title"><span id="eraseDeviceName">डिवाइस</span> मिटाएं?</h2>
+            <p class="erase-desc"><strong>चेतावनी:</strong> यह कार्य इस डिवाइस के सभी डेटा, ऐप और सेटिंग्स को स्थायी रूप
+                से मिटा देगा।</p>
+            <button class="action-btn" style="background:var(--color-danger);margin-bottom:10px;"
+                onclick="handleEraseConfirm()">डिवाइस मिटाएं</button>
+            <button class="secure-cancel-btn" style="width:100%;" onclick="toggleOverlay('erase',false)">रद्द
+                करें</button>
+        </div>
+    </div>
+
+    <!-- WIPE PROGRESS OVERLAY -->
+    <div class="overlay" id="wipeProgressOverlay">
+        <div class="wipe-progress-card">
+            <svg class="android-wipe-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                    d="M17.5 12c-.8 0-1.5-.7-1.5-1.5S16.7 9 17.5 9s1.5.7 1.5 1.5-.7 1.5-1.5 1.5zM6.5 12c-.8 0-1.5-.7-1.5-1.5S5.7 9 6.5 9 8 9.7 8 10.5 7.3 12 6.5 12zm13.1-6.1l1.7-2.9c.1-.2 0-.5-.2-.6s-.5 0-.6.2l-1.8 3c-1.8-1.2-4-2-6.5-2S7.4 4.4 5.6 5.6l-1.8-3c-.1-.2-.4-.3-.6-.2s-.3.4-.2.6l1.7 2.9C2.4 8 1 10.9 1 14.2V15h22v-.8c0-3.3-1.4-6.2-3.7-8.1zM3 17h18v1H3v-1zm2 3h2v2H5v-2zm12 0h2v2h-2v-2z" />
+            </svg>
+            <h2 class="ring-title" id="wipeProgressLabel">स्टोरेज डेटा मिटाया जा रहा है... 0%</h2>
+            <p class="ring-subtitle" style="font-size:0.8rem;">फैक्टरी रीसेट चल रही है। एन्क्रिप्शन हेडर नष्ट किए जा रहे
+                हैं।</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="wipeProgressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
