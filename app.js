@@ -264,7 +264,7 @@ function initMap() {
     map = L.map('map', { zoomControl: true, attributionControl: false })
         .setView([20.5937, 78.9629], 5); // India centre
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 20
     }).addTo(map);
 
